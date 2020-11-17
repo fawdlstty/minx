@@ -20,13 +20,14 @@ pub struct Logger {
 impl Logger {
 	pub fn new (&mut self, _log_path: &String) {
 		self.m_log_path = _log_path;
-		let (this.m_tx, rx) = mpsc::channel ();
-		tx.send (String::from("hi"));
+		let (_tx, _rx) = mpsc::channel ();
+		self.m_tx = _tx;
+		tx.send (String::from ("start program."));
 		self.m_thread = thread::spawn (move || {
 			while (true) {
-				match rx.recv () {
-					Ok (_msg) => println ("recv {:?}", _msg);
-					Err (_) break;
+				match _rx.recv () {
+					Ok (_msg) => println ("recv {:?}", _msg),
+					Err (_) break,
 				}
 			}
 		});
