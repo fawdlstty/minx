@@ -2,6 +2,12 @@
 
 mod config;
 use self::config::*;
+mod logger;
+use self::logger::*;
+
+
+
+use std::{thread, time};
 
 
 
@@ -12,13 +18,18 @@ fn help () {
     println!("");
 }
 
+//#[async_std::main]
 fn main() {
     let _args: Vec<String> = std::env::args ().collect ();
     //println!("{:?}", args);
     match get_config (&_args) {
         Some (_cfg) => {
-            println! ("log_path: {}", _cfg.log_path);
+            let _log = Logger::new (&_cfg.log_path);
         },
         None => help (),
+    }
+    loop {
+        let _ten_s = time::Duration::from_secs(10);
+        thread::sleep(_ten_s);
     }
 }

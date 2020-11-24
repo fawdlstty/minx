@@ -1,3 +1,3 @@
 pub trait ServerModule {
-	fn send (&mut self, &str) -> Future<bool>;
+	async fn send (&mut self, content: &str) -> bool;
 }
