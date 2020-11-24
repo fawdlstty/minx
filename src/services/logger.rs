@@ -7,8 +7,9 @@ use std::thread::JoinHandle;
 use std::time::SystemTime;
 use std::sync::mpsc;
 
-//pub mod pub_traits;
-use crate::pub_traits::*;
+//extern mod pub_trait;
+//mod pub_trait;
+//use crate::pub_trait::*;
 
 
 
@@ -25,7 +26,7 @@ pub struct Logger {
 	m_thread: JoinHandle<()>,
 }
 
-impl ServerModule for Logger {
+impl ServiceModule for Logger {
 	async fn send (&mut self, content: &str) -> bool {
 		//
 	}
