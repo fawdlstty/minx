@@ -17,7 +17,7 @@ pub struct ServiceDepends_Thread {
 }
 
 impl ServiceDepends_Thread {
-	pub fn new<F: FnOnce (Receiver<String>)> (f: F) -> ServiceDepends_Thread {
+	pub fn new<F: FnOnce (Receiver<String>) + Send + 'static> (f: F) -> ServiceDepends_Thread {
 		let (_sender, _receiver) = mpsc::channel ();
 		ServiceDepends_Thread {
 			m_sender: _sender,
