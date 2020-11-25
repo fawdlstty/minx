@@ -11,30 +11,53 @@ use self::logger::Logger;
 
 
 
-pub struct ServiceDepends_Thread {
+pub enum ServiceCallback { GoOn, Quit, }
+
+pub struct ServiceDepends4Thread {
 	m_sender: mpsc::Sender<String>,
 	m_thread: Option<JoinHandle<()>>,
+	m_quit: Box<dyn FnOnce ()>,
 }
 
-impl ServiceDepends_Thread {
-	pub fn new<F: FnOnce (Receiver<String>) + Send + 'static> (f: F) -> ServiceDepends_Thread {
+impl ServiceDepends4Thread {
+	pub fn new<Fc: FnOnce (String) -> ServiceCallback + Send + Copy + 'static, Fq: FnOnce () + Send + Copy + 'static> (on_callback: Fc, on_quit: Fq) -> ServiceDepends4Thread {
 		let (_sender, _receiver) = mpsc::channel ();
-		ServiceDepends_Thread {
+		ServiceDepends4Thread {
 			m_sender: _sender,
 			m_thread: Some (thread::spawn (move || {
-				f (_receiver);
-			}))
+				loop {
+					match _receiver.recv () {
+						Ok (_msg) => match f (_msg) {
+							ServiceCallback::GoOn => (),
+							ServiceCallback::Quit => break,
+						},
+						Err (_) => break,
+					}
+				}
+			})),
+			m_quit: Box::new (on_quit),
+		}
+	}
+
+	pub fn send (&mut self, content: String) -> bool {
+		match self.m_sender.send (content) {
+			Ok (_) => true,
+			Err (_) => false,
 		}
 	}
 }
 
-impl Drop for ServiceDepends_Thread {
+impl Drop for ServiceDepends4Thread {
 	fn drop (&mut self) {
+		self.m_quit ();
 		match self.m_thread.take () {
 			Some (_handle) => match _handle.join () { _ => (), },
 			None => (),
 		}
-		//self.m_thread.take ().unwrap ().join ().unwrap ();
+		match self.m_thread.take () {
+			Some (_thread) => match _thread.join () { Ok (_) => (), Err (_) => (), },
+			None => (),
+		};
 	}
 }
 
