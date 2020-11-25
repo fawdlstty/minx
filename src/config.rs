@@ -1,5 +1,6 @@
 use serde::{Serialize, Deserialize};
 
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 
@@ -16,9 +17,17 @@ use std::io::prelude::*;
 // }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct ModuleItem {
+    pub m_type: String,
+    pub m_name: String,
+    pub m_param: HashMap<String, String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub server_port: i32,
-    pub log_path: String,
+    pub log_console: bool,
+    pub modules: Vec<ModuleItem>,
 }
 
 pub fn get_config (_args: &Vec<String>) -> Option<Config> {

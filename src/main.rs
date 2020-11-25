@@ -24,7 +24,7 @@ fn main() {
     //println!("{:?}", args);
     match get_config (&_args) {
         Some (_cfg) => {
-            let _log = Logger::new (&_cfg.log_path);
+            let _services = ServiceManager::new (&_cfg.modules);
         },
         None => help (),
     }
