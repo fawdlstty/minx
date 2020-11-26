@@ -1,12 +1,9 @@
 use chrono::DateTime;
 use chrono::prelude::*;
 use serde::{Serialize,Deserialize};
-use std::{collections::HashMap, sync::mpsc::{Sender, Receiver}, fs::{File, OpenOptions}, sync::Arc};
+use std::fs::{File, OpenOptions};
 use std::io::Write;
-use std::thread;
-use std::thread::JoinHandle;
 use std::time::SystemTime;
-use std::sync::mpsc;
 
 //extern mod pub_trait;
 //mod services;
@@ -50,8 +47,7 @@ impl ServiceModule for Logger {
 }
 
 impl Logger {
-	pub fn new (_param: &HashMap<String, String>) -> Logger {
-		//let mut log_path = Arc::new (_param ["log_path"].to_string ());
+	pub fn new () -> Logger {
 		Logger {
 			m_thread: ServiceDepends4Thread::new (move |_msg| {
 				let _msg: Result<LogMsg, serde_json::Error> = serde_json::from_str (_msg);

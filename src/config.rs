@@ -55,22 +55,31 @@ pub fn get_config (_args: &Vec<String>) -> Option<Config> {
     };
 }
 
-pub static g_config: Option<Config> = None;
+pub static mut G_CONFIG: Option<Config> = None;
 
 pub fn get_config_item (_service_name: &str, _config_key: &str) -> Option<String> {
-    match g_config {
-        Some (_cfg) => {
-            let _ret: Option<String> = None;
-            for _item in _cfg.modules {
-                if _item.m_name == _service_name {
-                    _ret = match _item.m_param.get (_config_key) {
-                        Some (_val) => Some (_val.clone ()),
-                        None => None,
-                    }
-                }
-            }
-            _ret
-        },
-        None => None,
-    }
+    unsafe {
+		match &G_CONFIG {
+			Some (_cfg) => {
+				//let _ret: Option<String> = None;
+				let mut _iter = _cfg.modules.iter ();
+				loop {
+					match _iter.next () {
+						Some (_item) => {
+							if _item.m_name == _service_name {
+								return match _item.m_param.get (_config_key) {
+									Some (_val) => Some (_val.clone ()),
+									None => None,
+								};
+							}
+						},
+						None => {
+							return None;
+						},
+					};
+				}
+			},
+			None => None,
+		}
+	}
 }

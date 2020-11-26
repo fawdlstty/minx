@@ -22,13 +22,15 @@ fn help () {
 fn main() {
     let _args: Vec<String> = std::env::args ().collect ();
     //println!("{:?}", args);
-    g_config = get_config (&_args);
-    match g_config {
-        Some (_cfg) => {
-            let _services = ServiceManager::new (&_cfg.modules);
-        },
-        None => help (),
-    }
+    unsafe {
+		G_CONFIG = get_config (&_args);
+		match &G_CONFIG {
+			Some (_cfg) => {
+				let _services = ServiceManager::new (&_cfg.modules);
+			},
+			None => help (),
+		}
+	}
     loop {
         let _ten_s = time::Duration::from_secs(10);
         thread::sleep(_ten_s);
