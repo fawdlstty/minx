@@ -22,7 +22,8 @@ fn help () {
 fn main() {
     let _args: Vec<String> = std::env::args ().collect ();
     //println!("{:?}", args);
-    match get_config (&_args) {
+    g_config = get_config (&_args);
+    match g_config {
         Some (_cfg) => {
             let _services = ServiceManager::new (&_cfg.modules);
         },

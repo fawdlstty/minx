@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-use std::collections::HashMap;
+use std::{collections::HashMap, cmp::Ordering};
 use std::fs::File;
 use std::io::prelude::*;
 
@@ -53,4 +53,24 @@ pub fn get_config (_args: &Vec<String>) -> Option<Config> {
         },
         None => None,
     };
+}
+
+pub static g_config: Option<Config> = None;
+
+pub fn get_config_item (_service_name: &str, _config_key: &str) -> Option<String> {
+    match g_config {
+        Some (_cfg) => {
+            let _ret: Option<String> = None;
+            for _item in _cfg.modules {
+                if _item.m_name == _service_name {
+                    _ret = match _item.m_param.get (_config_key) {
+                        Some (_val) => Some (_val.clone ()),
+                        None => None,
+                    }
+                }
+            }
+            _ret
+        },
+        None => None,
+    }
 }
