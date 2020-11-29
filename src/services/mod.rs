@@ -1,4 +1,4 @@
-use std::{sync::Arc, collections::HashMap};
+use std::{collections::HashMap, sync::Arc, rc::Rc};
 use core::ops::FnOnce;
 use std::time::Duration;
 use std::sync::mpsc::{Sender, Receiver};
@@ -17,21 +17,20 @@ use self::logger::*;
 
 pub struct ServiceDepends4Thread {
 	m_sender: Option<mpsc::Sender<String>>,
-	m_expect_run: bool,
-	m_running: bool,
+	m_expect_run: Arc<bool>,
+	m_thread: Option<JoinHandle<()>>,
 }
 
 impl ServiceDepends4Thread {
-	pub fn new<Fc: FnOnce (&str) + Send + Copy + 'static, Fq: FnOnce () + Send + Copy + 'static> (on_callback: Fc, on_quit: Fq) -> Arc<ServiceDepends4Thread> {
+	pub fn new<T: Fn (&str) + Send + Copy + Sync> (on_callback: Arc<T>) -> ServiceDepends4Thread {
 		let (_sender, _receiver): (Sender<String>, Receiver<String>) = mpsc::channel ();
-		let mut _sd4t = Arc::new (ServiceDepends4Thread {
+		let mut _sd4t = ServiceDepends4Thread {
 			m_sender: Some (_sender),
-			m_expect_run: true,
-			m_running: true,
-			//m_thread: None,
-		});
-		let _sd4t_weak = Some (Arc::downgrade (&_sd4t));
-		/*_sd4t.m_thread =*/ thread::spawn (move || {
+			m_expect_run: Arc::new (true),
+			m_thread: None,
+		};
+		let _expect_run_weak = Arc::downgrade (&_sd4t.m_expect_run);
+		_sd4t.m_thread = Some (thread::spawn (move || {
 			loop {
 				match _receiver.recv_timeout (Duration::from_millis (10)) {
 					Ok (_msg) => {
@@ -47,12 +46,7 @@ impl ServiceDepends4Thread {
 					Err (_) => break,
 				}
 			}
-			on_quit ();
-			match _sd4t_weak.take ().unwrap ().upgrade () {
-				Some (__sd4t_2) => __sd4t_2.m_running = false,
-				None => (),
-			};
-		});
+		}));
 		_sd4t
 	}
 
