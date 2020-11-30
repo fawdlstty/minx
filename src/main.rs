@@ -1,13 +1,10 @@
 // cargo run -- -f minx.cfg
+use std::{thread, time};
 
 mod config;
 use self::config::*;
 mod services;
 use self::services::*;
-
-
-
-use std::{thread, time};
 
 
 
@@ -22,15 +19,14 @@ fn help () {
 fn main() {
     let _args: Vec<String> = std::env::args ().collect ();
     //println!("{:?}", args);
-    unsafe {
-		G_CONFIG = get_config (&_args);
-		match &G_CONFIG {
-			Some (_cfg) => {
-				let _services = ServiceManager::new (&_cfg.modules);
-			},
-			None => help (),
-		}
-	}
+    let _config = get_config (&_args);
+    match _config {
+        Some (_cfg) => {
+            let mut _services = ServiceManager::new (&_cfg.modules);
+            _services.send ("logger", "hello");
+        },
+        None => help (),
+    }
     loop {
         let _ten_s = time::Duration::from_secs(10);
         thread::sleep(_ten_s);
