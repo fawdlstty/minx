@@ -19,8 +19,8 @@ fn help () {
 fn main() {
     let _args: Vec<String> = std::env::args ().collect ();
     //println!("{:?}", args);
-    let _config = get_config (&_args);
-    match _config {
+    let _cfg = get_config (&_args);
+    match _cfg {
         Some (_cfg) => {
             let mut _services = ServiceManager::new (&_cfg.modules);
             _services.send ("logger", "hello");

@@ -41,9 +41,12 @@ impl ServiceModule for Logger {
 	fn get_name (&self) -> &'static str {
 		"logger"
 	}
-	//fn send (&mut self, content: String) -> bool {
-	//	self.m_thread.send_str (content)
-	//}
+	fn send (&mut self, content: String) -> bool {
+		self.m_thread.send (content)
+	}
+	fn close (&mut self) {
+		self.m_thread.send (String::from ("Program Exit."));
+	}
 }
 
 impl Logger {
@@ -60,8 +63,8 @@ impl Logger {
 			},
 		};
 		Logger {
-			m_thread: ServiceDepends4Thread::new (move |_msg| {
-				let _msg: Result<LogMsg, serde_json::Error> = serde_json::from_str (_msg);
+			m_thread: ServiceDepends4Thread::new (move |_msg: String| {
+				let _msg: Result<LogMsg, serde_json::Error> = serde_json::from_str (&_msg [..]);
 				match _msg {
 					Ok (_msg) => {
 						let _time = SystemTime::now ();
