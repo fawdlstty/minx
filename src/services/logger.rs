@@ -31,6 +31,22 @@ impl LogMsg {
 			m_content: _content,
 		}
 	}
+	fn write_log (&self) {
+		//println! ("recv {:?}", msg);
+		let _time = SystemTime::now ();
+		let _time: DateTime<Local> = _time.into ();
+
+		let _date = _time.format ("%Y%m%d").to_string ();
+		let _file_path = format! ("{}{}.log", _log_path, _date);
+		let mut _file = match OpenOptions::new ().append (true).open (_file_path.clone ()) {
+			Ok (_file) => _file,
+			Err (_) => File::create (_file_path.clone ()).unwrap (),
+		};
+
+		let _date = _time.format ("%Y%m%d-%H%M%S").to_string ();
+		let _content = format! ("[{}][{:?}][{}]  {}\n", _date, self.m_level, self.m_module, self.m_content);
+		_file.write_all (_content.as_bytes ()).unwrap ();
+	}
 }
 
 pub struct Logger {
@@ -44,10 +60,10 @@ impl ServiceModule for Logger {
 	fn send (&mut self, content: String) -> bool {
 		self.m_thread.send (content)
 	}
-	fn close (&mut self) {
-		// TODO: 没调用到
-		self.send (String::from ("logger"), Level::CRIT, String::from ("Program Exit."));
-	}
+	// fn close (&mut self) {
+	// 	// TODO: 没调用到
+	// 	self.send (String::from ("logger"), Level::CRIT, String::from ("Program Exit."));
+	// }
 }
 
 impl Logger {
@@ -67,24 +83,11 @@ impl Logger {
 			m_thread: ServiceDepends4Thread::new (move |_msg: String| {
 				let _msg: Result<LogMsg, serde_json::Error> = serde_json::from_str (&_msg [..]);
 				match _msg {
-					Ok (_msg) => {
-						//println! ("recv {:?}", msg);
-						let _time = SystemTime::now ();
-						let _time: DateTime<Local> = _time.into ();
-
-						let _date = _time.format ("%Y%m%d").to_string ();
-						let _file_path = format! ("{}{}.log", _log_path, _date);
-						let mut _file = match OpenOptions::new ().append (true).open (_file_path.clone ()) {
-							Ok (_file) => _file,
-							Err (_) => File::create (_file_path.clone ()).unwrap (),
-						};
-
-						let _date = _time.format ("%Y%m%d-%H%M%S").to_string ();
-						let _content = format! ("[{}][{:?}][{}]  {}\n", _date, _msg.m_level, _msg.m_module, _msg.m_content);
-						_file.write_all (_content.as_bytes ()).unwrap ();
-					},
+					Ok (_msg) => _msg.write_log (),
 					Err (_) => (),
 				};
+			}, move || {
+				LogMsg::new (String::from ("logger"), Level::CRIT, String::from ("Program Stop.")).write_log ();
 			}),
 		};
 		_ret.send (String::from ("logger"), Level::CRIT, String::from ("Program Start."));

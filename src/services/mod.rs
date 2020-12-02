@@ -1,7 +1,8 @@
-use std::{cell::Cell, collections::HashMap, cell::RefCell, sync::{Mutex, RwLock}};
+use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
+use std::sync::mpsc::{Sender, Receiver};
+use std::sync::Mutex;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -13,13 +14,13 @@ use self::logger::*;
 
 
 pub struct ServiceDepends4Thread {
-	m_sender: Mutex<mpsc::Sender<String>>,
+	m_sender: Mutex<mpsc::Sender<Option<String>>>,
 	m_thread: Option<JoinHandle<()>>,
 }
 
 impl ServiceDepends4Thread {
-	pub fn new<Tf: Fn (String) + Send + Sync + 'static> (on_callback: Tf) -> ServiceDepends4Thread {
-		let (_sender, _receiver): (Sender<String>, Receiver<String>) = mpsc::channel ();
+	pub fn new<Tc: Fn (String) + Send + Sync + 'static, Tq: Fn () + Send + Sync + 'static> (on_callback: Tc, on_quit: Tq) -> ServiceDepends4Thread {
+		let (_sender, _receiver): (Sender<Option<String>>, Receiver<Option<String>>) = mpsc::channel ();
 		let mut _sd4t = ServiceDepends4Thread {
 			m_sender: Mutex::new (_sender),
 			m_thread: None,
@@ -27,10 +28,14 @@ impl ServiceDepends4Thread {
 		_sd4t.m_thread = Some (thread::spawn (move || {
 			loop {
 				match _receiver.recv_timeout (Duration::from_millis (10)) {
-					Ok (_msg) => on_callback (_msg),
-					Err (_) => break,
+					Ok (_msg) => match _msg {
+						Some (_msg) => on_callback (_msg),
+						None => break,
+					},
+					Err (_) => (),
 				}
 			}
+			on_quit ();
 		}));
 		_sd4t
 	}
@@ -44,7 +49,7 @@ impl ServiceDepends4Thread {
 
 	pub fn send (&mut self, content: String) -> bool {
 		match self.m_sender.lock () {
-		    Ok(_sender) => match _sender.send (content) {
+		    Ok(_sender) => match _sender.send (Some (content)) {
 				Ok (_) => true,
 				Err (_) => false,
 			},
@@ -68,7 +73,6 @@ impl Drop for ServiceDepends4Thread {
 pub trait ServiceModule: Send + Sync {
 	fn get_name (&self) -> &'static str;
 	fn send (&mut self, content: String) -> bool;
-	fn close (&mut self);
 }
 
 
@@ -106,6 +110,7 @@ impl ServiceManager {
 		}
 		let _modules_map = Arc::new (_modules_map);
 		let _modules_map_weak = Arc::downgrade (&_modules_map);
+		let _modules_map_weak2 = _modules_map_weak.clone ();
 		let mut _sm = ServiceManager {
 			m_thread: ServiceDepends4Thread::new (move |_msg: String| {
 				let _modules_map = _modules_map_weak.upgrade ().unwrap ();
@@ -126,7 +131,7 @@ impl ServiceManager {
 					},
 					None => false,
 				};
-			}),
+			}, move || {}),
 			m_modules: _modules_map,
 		};
 		_sm
@@ -134,5 +139,11 @@ impl ServiceManager {
 
 	pub fn send (&mut self, module_name: &str, content: &str) {
 		self.m_thread.send (format! ("{}|{}", module_name, content));
+	}
+}
+
+impl Drop for ServiceManager {
+	fn drop (&mut self) {
+		//self.m_thread.send (None);
 	}
 }
