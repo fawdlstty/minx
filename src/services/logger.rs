@@ -31,7 +31,7 @@ impl LogMsg {
 			m_content: _content,
 		}
 	}
-	fn write_log (&self) {
+	fn write_log (&self, _log_path: &String) {
 		//println! ("recv {:?}", msg);
 		let _time = SystemTime::now ();
 		let _time: DateTime<Local> = _time.into ();
@@ -39,18 +39,34 @@ impl LogMsg {
 		let _date = _time.format ("%Y%m%d").to_string ();
 		let _file_path = format! ("{}{}.log", _log_path, _date);
 		let mut _file = match OpenOptions::new ().append (true).open (_file_path.clone ()) {
-			Ok (_file) => _file,
-			Err (_) => File::create (_file_path.clone ()).unwrap (),
+			Ok (_file) => Some (_file),
+			Err (_) => match File::create (_file_path.clone ()) {
+			    Ok(_file) => Some (_file),
+			    Err(_err) => {
+					println! ("Create File Failed: {:?}", _err);
+					None
+				},
+			},
 		};
 
 		let _date = _time.format ("%Y%m%d-%H%M%S").to_string ();
 		let _content = format! ("[{}][{:?}][{}]  {}\n", _date, self.m_level, self.m_module, self.m_content);
-		_file.write_all (_content.as_bytes ()).unwrap ();
+		match _file {
+			Some (mut _file) => match _file.write_all (_content.as_bytes ()) {
+			    Ok(_) => (),
+			    Err(_err) => {
+					println! ("Write File Failed: {:?}", _err);
+					println! ("{}", _content);
+				},
+			},
+			None => println! ("{}", _content),
+		}
 	}
 }
 
 pub struct Logger {
 	m_thread: ServiceDepends4Thread,
+	//m_log_path: String,
 }
 
 impl ServiceModule for Logger {
@@ -60,10 +76,6 @@ impl ServiceModule for Logger {
 	fn send (&mut self, content: String) -> bool {
 		self.m_thread.send (content)
 	}
-	// fn close (&mut self) {
-	// 	// TODO: 没调用到
-	// 	self.send (String::from ("logger"), Level::CRIT, String::from ("Program Exit."));
-	// }
 }
 
 impl Logger {
@@ -79,16 +91,17 @@ impl Logger {
 				}
 			},
 		};
+		let _log_path2 = _log_path.clone ();
+		//let _log_path3 = _log_path.clone ();
 		let mut _ret = Logger {
 			m_thread: ServiceDepends4Thread::new (move |_msg: String| {
 				let _msg: Result<LogMsg, serde_json::Error> = serde_json::from_str (&_msg [..]);
 				match _msg {
-					Ok (_msg) => _msg.write_log (),
+					Ok (_msg) => _msg.write_log (&_log_path),
 					Err (_) => (),
 				};
-			}, move || {
-				LogMsg::new (String::from ("logger"), Level::CRIT, String::from ("Program Stop.")).write_log ();
 			}),
+			//m_log_path: _log_path3,
 		};
 		_ret.send (String::from ("logger"), Level::CRIT, String::from ("Program Start."));
 		_ret
@@ -103,14 +116,7 @@ impl Logger {
 
 impl Drop for Logger {
 	fn drop (&mut self) {
-		//self.m_sender.clone ().send (LogMsg {
-		//	m_level: Level::CRIT,
-		//	m_content: String::from ("stop program.")
-		//}).unwrap ();
-		//match self.m_thread.take () {
-		//	Some (_handle) => match _handle.join () { _ => (), },
-		//	None => (),
-		//}
-		////self.m_thread.take ().unwrap ().join ().unwrap ();
+		// TODO: 调用不到
+		//LogMsg::new (String::from ("logger"), Level::CRIT, String::from ("Program Stop.")).write_log (&self.m_log_path);
 	}
 }
