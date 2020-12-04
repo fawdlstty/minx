@@ -1,11 +1,6 @@
+use async_trait::async_trait;
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::mpsc;
-use std::sync::mpsc::{Sender, Receiver};
-use std::sync::Mutex;
-use std::thread;
-use std::thread::JoinHandle;
-use std::time::Duration;
+
 
 use crate::config::ModuleItem;
 mod logger;
@@ -13,120 +8,93 @@ use self::logger::*;
 
 
 
-pub struct ServiceDepends4Thread {
-	m_sender: Mutex<mpsc::Sender<String>>,
-	m_thread: Option<JoinHandle<()>>,
-}
-
-impl ServiceDepends4Thread {
-	pub fn new<Tc: Fn (String) + Send + Sync + 'static> (on_callback: Tc) -> ServiceDepends4Thread {
-		let (_sender, _receiver): (Sender<String>, Receiver<String>) = mpsc::channel ();
-		let mut _sd4t = ServiceDepends4Thread {
-			m_sender: Mutex::new (_sender),
-			m_thread: None,
-		};
-		_sd4t.m_thread = Some (thread::spawn (move || {
-			loop {
-				match _receiver.recv_timeout (Duration::from_millis (10)) {
-					Ok (_msg) => on_callback (_msg),
-					Err (_) => (),
-				}
-			}
-		}));
-		_sd4t
-	}
-
-	//pub fn send<T: Serialize> (&mut self, obj: &T) -> bool {
-	//	match serde_json::to_string (obj) {
-	//		Ok (_content) => self.send_str (_content),
-	//		Err (_) => false,
-	//	}
-	//}
-
-	pub fn send (&mut self, content: String) -> bool {
-		match self.m_sender.lock () {
-		    Ok(_sender) => match _sender.send (content) {
-				Ok (_) => true,
-				Err (_) => false,
-			},
-		    Err(_) => false
-		}
-	}
-}
-
-impl Drop for ServiceDepends4Thread {
-	fn drop (&mut self) {
-		// match self.m_thread.take () {
-		// 	Some (_thread) => match _thread.join () { _ => (), },
-		// 	None => (),
-		// }
-	}
-}
-
-
-
-pub trait ServiceModule: Send + Sync {
+#[async_trait]
+pub trait ServiceModule {
 	fn get_name (&self) -> &'static str;
-	fn send (&mut self, content: String) -> bool;
+	async fn async_send (&self, _msg: String) -> bool;
 }
 
 
 
 pub struct ServiceManager {
-	m_thread: ServiceDepends4Thread,
+	m_modules_map: HashMap<&'static str, Box<(dyn ServiceModule + 'static)>>,
 }
 
 //_ret.send (&LogMsg::new (Level::INFO, String::from ("start program.")));
 impl ServiceManager {
-	pub fn new (_modules: &Vec<ModuleItem>) -> ServiceManager {
-		let mut _modules_map: HashMap<&'static str, Arc<Mutex<(dyn ServiceModule + 'static)>>> = HashMap::new ();
+	pub async fn new (_modules: &Vec<ModuleItem>) -> ServiceManager {
+		let mut _ret = ServiceManager {
+			m_modules_map: HashMap::new (),
+		};
 		for _module_item in _modules {
-			let _sm_item: Option<Arc<Mutex<(dyn ServiceModule + 'static)>>> = match _module_item.m_type.as_str () {
+			match match _module_item.m_type.as_str () {
 				"built-in" => match _module_item.m_name.as_str () {
-					"logger" => Some (Arc::new (Mutex::new (Logger::new (&_module_item.m_param)))),
+					"logger" => Some (Box::new (Logger::new (&_module_item.m_param))),
 					_ => None,
 				},
 				_ => None,
-			};
-			match _sm_item {
-				Some (_obj) => {
-					//_modules_map.insert (_obj.get_mut ().unwrap ().get_name (), _obj);
-					match _obj.lock () {
-					    Ok(_obj1) => {
-							_modules_map.insert (_obj1.get_name (), _obj.clone ());
-							()
-						},
-					    Err(_) => (),
-					};
+			} {
+				Some (_module) => {
+					_ret.m_modules_map.insert (_module.get_name (), _module);
+					()
 				},
-				None => ()
-			}
+				None => println! ("load module[{}] failed.", _module_item.m_type),
+			};
 		}
-		let mut _sm = ServiceManager {
-			m_thread: ServiceDepends4Thread::new (move |_msg: String| {
-				let _success = match _msg.find ('|') {
-					Some (_size) => {
-						match _modules_map.get (&_msg[.._size]) {
-							Some (mut _sm) => {
-								let _content = (&_msg[_size+1..]).to_string ();
-								match _sm.lock () {
-								    Ok(mut _sm1) => _sm1.send (_content),
-								    Err(_) => false
-								}
-							},
-							None => false,
-						}
-					},
-					None => false,
-				};
-			}),
-		};
-		_sm
+		_ret
+		// let mut _sm = ServiceManager {
+		// 	m_thread: ServiceDepends4Thread::new (move |_msg: String| {
+		// 		let _success = match _msg.find ('|') {
+		// 			Some (_size) => {
+		// 				match _modules_map.get (&_msg[.._size]) {
+		// 					Some (mut _sm) => {
+		// 						let _content = (&_msg[_size+1..]).to_string ();
+		// 						match _sm.lock () {
+		// 						    Ok(mut _sm1) => _sm1.send (_content),
+		// 						    Err(_) => false
+		// 						}
+		// 					},
+		// 					None => false,
+		// 				}
+		// 			},
+		// 			None => false,
+		// 		};
+		// 	}),
+		// };
 	}
 
-	pub fn send (&mut self, module_name: &str, content: &str) {
-		self.m_thread.send (format! ("{}|{}", module_name, content));
+	pub async fn async_send (&self, _module_name: &str, _msg: String) -> bool {
+		//self.m_thread.send (format! ("{}|{}", module_name, content));
+		match self.m_modules_map.get (_module_name) {
+		    Some(_module) => _module.async_send (_msg).await,
+		    None => {
+				let _err_str = format! ("cannot load module[{}], please check cfg file.", _module_name);
+				if _module_name == "logger" {
+					println! ("{}", _err_str);
+				} else {
+					self.async_send ("logger", _err_str);
+				}
+				false
+			},
+		}
 	}
+
+	async fn async_logger (&self, _module: String, _level: Level, _content: String) -> bool {
+		let _msg = LogMsg::new (_module, _level, _content);
+		match _msg.to_string () {
+			Some (_str) => self.async_send ("logger", _str).await,
+			None => {
+				println! ("cannot serilize object LogMsg: [{:?}]", _msg);
+				false
+			}
+		}
+	}
+	pub async fn async_logger_trace (&self, _module: String, _content: String) -> bool { self.async_logger (_module, Level::TRCE, _content).await }
+	pub async fn async_logger_debug (&self, _module: String, _content: String) -> bool { self.async_logger (_module, Level::DEBG, _content).await }
+	pub async fn async_logger_info (&self, _module: String, _content: String) -> bool { self.async_logger (_module, Level::INFO, _content).await }
+	pub async fn async_logger_warning (&self, _module: String, _content: String) -> bool { self.async_logger (_module, Level::WARN, _content).await }
+	pub async fn async_logger_error (&self, _module: String, _content: String) -> bool { self.async_logger (_module, Level::EROR, _content).await }
+	pub async fn async_logger_critical (&self, _module: String, _content: String) -> bool { self.async_logger (_module, Level::CRIT, _content).await }
 }
 
 impl Drop for ServiceManager {

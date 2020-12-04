@@ -1,7 +1,9 @@
 // cargo run -- -f minx.cfg
-use std::{thread, time};
+use std::{f64::consts::FRAC_1_PI, thread, time::{self, Duration}};
 
 mod config;
+use async_std::task::{sleep, spawn};
+
 use self::config::*;
 mod services;
 use self::services::*;
@@ -15,20 +17,16 @@ fn help () {
     println!("");
 }
 
-//#[async_std::main]
-fn main() {
+#[async_std::main]
+async fn main () {
     let _args: Vec<String> = std::env::args ().collect ();
     //println!("{:?}", args);
-    let _cfg = get_config (&_args);
+    let _cfg = get_config (&_args).await;
     match _cfg {
         Some (_cfg) => {
-            let mut _services = ServiceManager::new (&_cfg.modules);
-            _services.send ("logger", "hello");
+            let mut _services = ServiceManager::new (&_cfg.modules).await;
+            _services.async_logger_critical (String::from ("main"), String::from ("Program Start.")).await;
         },
         None => help (),
-    }
-    loop {
-        let _ten_s = time::Duration::from_secs(10);
-        thread::sleep(_ten_s);
     }
 }

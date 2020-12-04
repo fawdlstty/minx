@@ -1,7 +1,7 @@
+use async_std::fs::File;
+use async_std::prelude::*;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::prelude::*;
 
 
 
@@ -19,14 +19,14 @@ pub struct Config {
     pub modules: Vec<ModuleItem>,
 }
 
-pub fn get_config (_args: &Vec<String>) -> Option<Config> {
+pub async fn get_config (_args: &Vec<String>) -> Option<Config> {
     return match _args.get (1) {
         Some (a) => match a.as_str () {
             "-f" => match _args.get (2) {
-                Some (b) => match File::open (b) {
+                Some (b) => match File::open (b).await {
                     Ok (mut _f) => {
                         let mut _buf = String::new ();
-                        match _f.read_to_string (&mut _buf) {
+                        match _f.read_to_string (&mut _buf).await {
                             Ok (_) => match serde_json::from_str (&_buf.as_str ()) {
                                 Ok (c) => Some (c),
                                 Err (_) => None,
