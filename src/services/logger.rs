@@ -75,9 +75,9 @@ pub struct Logger {
 
 #[async_trait]
 impl ServiceModule for Logger {
-	fn get_name (&self) -> &'static str {
-		"logger"
-	}
+	fn get_name (&self) -> &'static str { "logger" }
+	fn is_entry (&self) -> bool { false }
+	async fn async_entry (&self) {}
 	async fn async_send (&self, _msg: String) -> bool {
 		let _msg: Result<LogMsg, serde_json::Error> = serde_json::from_str (&_msg [..]);
 		match _msg {

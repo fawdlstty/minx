@@ -1,8 +1,7 @@
 // cargo run -- -f minx.cfg
-use std::{f64::consts::FRAC_1_PI, thread, time::{self, Duration}};
 
 mod config;
-use async_std::task::{sleep, spawn};
+//use async_std::task::{sleep, spawn};
 
 use self::config::*;
 mod services;
@@ -24,7 +23,7 @@ async fn main () {
     let _cfg = get_config (&_args).await;
     match _cfg {
         Some (_cfg) => {
-            let mut _services = ServiceManager::new (&_cfg.modules).await;
+            let mut _services = ServiceManager::new (_cfg.modules);
             _services.async_logger_critical (String::from ("main"), String::from ("Program Start.")).await;
         },
         None => help (),

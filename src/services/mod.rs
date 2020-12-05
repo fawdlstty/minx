@@ -1,16 +1,26 @@
 use async_trait::async_trait;
-use std::collections::HashMap;
-
+use std::{future::Future, collections::HashMap};
 
 use crate::config::ModuleItem;
+
+use self::logger::{Level, LogMsg, Logger};
+
+
+//use crate::config::ModuleItem;
 mod logger;
-use self::logger::*;
+//use self::logger::*;
 
 
 
 #[async_trait]
 pub trait ServiceModule {
+	// 获取模块名称
 	fn get_name (&self) -> &'static str;
+	// 判断是否包括入口
+	fn is_entry (&self) -> bool;
+	// 进入入口
+	async fn async_entry (&self);
+	// 发送信息
 	async fn async_send (&self, _msg: String) -> bool;
 }
 
@@ -20,9 +30,8 @@ pub struct ServiceManager {
 	m_modules_map: HashMap<&'static str, Box<(dyn ServiceModule + 'static)>>,
 }
 
-//_ret.send (&LogMsg::new (Level::INFO, String::from ("start program.")));
 impl ServiceManager {
-	pub async fn new (_modules: &Vec<ModuleItem>) -> ServiceManager {
+	pub fn new (_modules: Vec<ModuleItem>) -> ServiceManager {
 		let mut _ret = ServiceManager {
 			m_modules_map: HashMap::new (),
 		};
@@ -42,25 +51,6 @@ impl ServiceManager {
 			};
 		}
 		_ret
-		// let mut _sm = ServiceManager {
-		// 	m_thread: ServiceDepends4Thread::new (move |_msg: String| {
-		// 		let _success = match _msg.find ('|') {
-		// 			Some (_size) => {
-		// 				match _modules_map.get (&_msg[.._size]) {
-		// 					Some (mut _sm) => {
-		// 						let _content = (&_msg[_size+1..]).to_string ();
-		// 						match _sm.lock () {
-		// 						    Ok(mut _sm1) => _sm1.send (_content),
-		// 						    Err(_) => false
-		// 						}
-		// 					},
-		// 					None => false,
-		// 				}
-		// 			},
-		// 			None => false,
-		// 		};
-		// 	}),
-		// };
 	}
 
 	pub async fn async_send (&self, _module_name: &str, _msg: String) -> bool {
@@ -69,11 +59,7 @@ impl ServiceManager {
 		    Some(_module) => _module.async_send (_msg).await,
 		    None => {
 				let _err_str = format! ("cannot load module[{}], please check cfg file.", _module_name);
-				if _module_name == "logger" {
-					println! ("{}", _err_str);
-				} else {
-					self.async_send ("logger", _err_str);
-				}
+				println! ("{}", _err_str);
 				false
 			},
 		}
