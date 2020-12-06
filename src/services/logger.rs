@@ -76,8 +76,13 @@ pub struct Logger {
 #[async_trait]
 impl ServiceModule for Logger {
 	fn get_name (&self) -> &'static str { "logger" }
-	fn is_entry (&self) -> bool { false }
-	async fn async_entry (&self) {}
+	async fn async_entry (&self) {
+		let _msg = LogMsg::new (String::from ("logger"), Level::CRIT, String::from ("Program Start."));
+		match _msg.to_string () {
+			Some (_str) => { self.async_send (_str).await; () },
+			None => { println! ("cannot serilize object LogMsg: [{:?}]", _msg) }
+		};
+	}
 	async fn async_send (&self, _msg: String) -> bool {
 		let _msg: Result<LogMsg, serde_json::Error> = serde_json::from_str (&_msg [..]);
 		match _msg {

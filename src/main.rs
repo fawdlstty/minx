@@ -24,7 +24,7 @@ async fn main () {
     match _cfg {
         Some (_cfg) => {
             let mut _services = ServiceManager::new (_cfg.modules);
-            _services.async_logger_critical (String::from ("main"), String::from ("Program Start.")).await;
+            //_services.async_logger_critical ("main", "Program Start.").await;
         },
         None => help (),
     }
