@@ -1,15 +1,15 @@
 use async_std::task;
 use async_trait::async_trait;
-use std::{collections::HashMap, future::Future, sync::{Arc, Mutex}};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::config::ModuleItem;
 
-use self::logger::{Level, LogMsg, Logger};
+use self::logger::*;
+use self::http::*;
 
-
-//use crate::config::ModuleItem;
 mod logger;
-//use self::logger::*;
+mod http;
 
 
 
@@ -35,13 +35,15 @@ impl ServiceManager {
 			m_modules_map: HashMap::new (),
 		};
 		for _module_item in _modules {
-			match match _module_item.m_type.as_str () {
+			let _ptr: Option<Arc<dyn ServiceModule>> =  match _module_item.m_type.as_str () {
 				"built-in" => match _module_item.m_name.as_str () {
 					"logger" => Some (Arc::new (Logger::new (&_module_item.m_param))),
+					"http" => Some (Arc::new (Http::new (&_module_item.m_param))),
 					_ => None,
 				},
 				_ => None,
-			} {
+			};
+			match _ptr {
 				Some (_module) => {
 					_ret.m_modules_map.insert (_module.get_name (), _module);
 					()
@@ -52,42 +54,15 @@ impl ServiceManager {
 		_ret
 	}
 
-	async fn async_entry (&self) {
-		let mut _v: Option<Arc<dyn ServiceModule>> = None;
+	async fn _async_entry_item (_item: Arc<dyn ServiceModule>) {
+		_item.async_entry ().await;
+	}
+
+	pub async fn async_entry (&self) {
 		let mut _vs = Vec::new ();
 		for (_key, _value) in &self.m_modules_map {
-			match &_v {
-				Some (_v1) => {
-					//let _value2 = Some (_value.clone ());
-					// let _f: dyn FnOnce(dyn Future<Output=()>) = move || async {
-					// 	match _value2.take () {
-					// 		Some (_value2) => _value2.async_entry ().await,
-					// 		None => (),
-					// 	}
-					// };
-					// _vs.push (spawn (_f.call_once ()));
-					//
-					// let _value2 = Mutex::new (_value.clone ());
-					// _vs.push (task::spawn ((move || async {
-					// 	let _value3 = _value2.lock ();
-					// 	match _value3 {
-					// 	    Ok(_value3) => { _value3.async_entry ().await; () },
-					// 	    Err(_) => (),
-					// 	};
-					// })()));
-					//
-					let _value2 = _value.clone ();
-					_vs.push (task::spawn ((move || async {
-						_value2.async_entry ().await;
-					})()));
-				},
-				None => _v = Some (_value.clone ()),
-			}
+			_vs.push (task::spawn (ServiceManager::_async_entry_item (_value.clone ())));
 		}
-		match &_v {
-			Some (_v1) => _v1.async_entry ().await,
-			None => (),
-		};
 		for _item in _vs {
 			_item.await;
 		}
