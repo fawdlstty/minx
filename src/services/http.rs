@@ -3,7 +3,7 @@ use actix_web::{App, Error, HttpRequest, HttpResponse, HttpServer, Responder, ge
 use actix_web::web;
 use actix_web_actors::ws;
 use async_trait::async_trait;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::ServiceModule;
 
@@ -17,14 +17,13 @@ impl ServiceModule for Http {
 	async fn async_entry (&self) {
 		match HttpServer::new (|| {
 			App::new ()
-				//.service (minx_hello)
-				//.service (minx_ws)
+				.service (minx_hello)
+				.service (minx_ws)
 				//.route ("/hey", web::get ().to (manual_hello))
 		}).bind ("127.0.0.1:8080") {
 		    Ok (mut _server) => { _server.run ().await; () },
 		    Err (_e) => println! ("http listen failed: {}", _e.to_string ()),
 		};
-		let _c = 5;
 	}
 	async fn async_send (&self, _msg: String) -> bool {
 		false
@@ -58,7 +57,6 @@ impl Actor for MyWs {
     type Context = ws::WebsocketContext<Self>;
 }
 
-/// Handler for ws::Message message
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWs {
     fn handle (&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
@@ -72,5 +70,8 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWs {
 
 #[get ("/minx_ws")]
 async fn minx_ws (req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
-    ws::start (MyWs {}, &req, stream)
+	println! ("recv websocket connect request");
+	let _ws = MyWs {};
+	let mut _ws: Arc<MyWs> = Arc::new (_ws);
+    ws::start (*_ws. (), &req, stream)
 }
