@@ -1,4 +1,4 @@
-use actix::{Actor, ActorContext, Addr, Recipient, StreamHandler};
+use actix::{Actor, ActorContext, Addr, Recipient, StreamHandler, clock::Instant};
 use actix::prelude::*;
 use actix_web::{App, Error, HttpRequest, HttpResponse, HttpServer, Responder, get};
 use actix_web::web;
@@ -97,8 +97,54 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for ChatServer {
 
 // https://github.com/actix/examples/blob/master/websocket-chat/src/main.rs
 // https://github.com/actix/examples/blob/master/websocket-chat/src/server.rs
-async fn minx_ws (req: HttpRequest, stream: web::Payload, _srv: web::Data<Addr<server::ChatServer>>) -> Result<HttpResponse, Error> {
-    ws::start (ChatServer {}, &req, stream)
+async fn minx_ws (req: HttpRequest, stream: web::Payload, _srv: web::Data<Addr<ChatServer>>) -> Result<HttpResponse, Error> {
+    ws::start (WsChatSession {
+		id: 0,
+		hb: Instant::now (),
+		name: None,
+		addr: _srv.get_ref ().clone (),
+	}, &req, stream)
+}
+
+struct WsChatSession {
+    id: i64,
+    hb: Instant,
+    name: Option<String>,
+    addr: Addr<ChatServer>,
+}
+impl Actor for WsChatSession {
+    type Context = ws::WebsocketContext<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        // we'll start heartbeat process on session start.
+        self.hb(ctx);
+
+        // register self in chat server. `AsyncContext::wait` register
+        // future within context, but context waits until this future resolves
+        // before processing any other events.
+        // HttpContext::state() is instance of WsChatSessionState, state is shared
+        // across all routes within application
+        let addr = ctx.address();
+        self.addr
+            .send(server::Connect {
+                addr: addr.recipient(),
+            })
+            .into_actor(self)
+            .then(|res, act, ctx| {
+                match res {
+                    Ok(res) => act.id = res,
+                    // something is wrong with chat server
+                    _ => ctx.stop(),
+                }
+                fut::ready(())
+            })
+            .wait(ctx);
+    }
+
+    fn stopping(&mut self, _: &mut Self::Context) -> Running {
+        // notify chat server
+        self.addr.do_send(server::Disconnect { id: self.id });
+        Running::Stop
+    }
 }
 
 // #[derive(Message)]
