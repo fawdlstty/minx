@@ -1,14 +1,17 @@
-use actix::{Actor, StreamHandler};
+use actix::{Actor, ActorContext, Addr, Recipient, StreamHandler};
+use actix::prelude::*;
 use actix_web::{App, Error, HttpRequest, HttpResponse, HttpServer, Responder, get};
 use actix_web::web;
 use actix_web_actors::ws;
+use async_std::sync::Mutex;
 use async_trait::async_trait;
-use std::{collections::HashMap, sync::Arc};
+use std::{sync::atomic::AtomicI64, collections::HashMap, collections::HashSet, sync::Arc};
 
 use crate::ServiceModule;
 
 pub struct Http {
 	m_port: i32,
+	m_server: ChatServer::new ().start (),
 }
 
 #[async_trait]
@@ -18,7 +21,7 @@ impl ServiceModule for Http {
 		match HttpServer::new (|| {
 			App::new ()
 				.service (minx_hello)
-				.service (minx_ws)
+				.service (web::resource ("/minx_ws/").to (minx_ws))
 				//.route ("/hey", web::get ().to (manual_hello))
 		}).bind ("127.0.0.1:8080") {
 		    Ok (mut _server) => { _server.run ().await; () },
@@ -51,13 +54,33 @@ async fn minx_hello () -> impl Responder {
 
 
 
-struct MyWs;
+#[derive (Message)]
+#[rtype (result = "()")]
+pub struct WsMessage (pub String);
 
-impl Actor for MyWs {
-    type Context = ws::WebsocketContext<Self>;
+struct ChatServer {
+	m_inc: Arc<AtomicI64>,
+	m_sessions: HashMap<i64, Recipient<WsMessage>>,
+}
+impl ChatServer {
+	pub fn new () -> ChatServer {
+		ChatServer {
+			m_inc: Arc::new (AtomicI64::new (0)),
+			m_sessions: HashMap::new (),
+		}
+	}
 }
 
-impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWs {
+impl Actor for ChatServer {
+   type Context = ws::WebsocketContext<Self>;
+}
+impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for ChatServer {
+	fn started (&mut self, _ctx: &mut Self::Context) {
+		// let mut _map: HashMap<i64, &Self::Context> = HashMap::new ();
+		// let mut _xx: &Self::Context = _map.get (&2333).unwrap ();
+		// _xx.text ("aaas");
+	}
+
     fn handle (&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
             Ok(ws::Message::Ping (msg)) => ctx.pong (&msg),
@@ -65,13 +88,78 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWs {
             Ok(ws::Message::Binary (bin)) => ctx.binary (bin),
             _ => (),
         }
+	}
+
+	fn finished (&mut self, ctx: &mut Self::Context) {
+        ctx.stop ()
     }
 }
 
-#[get ("/minx_ws")]
-async fn minx_ws (req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
-	println! ("recv websocket connect request");
-	let _ws = MyWs {};
-	let mut _ws: Arc<MyWs> = Arc::new (_ws);
-    ws::start (*_ws. (), &req, stream)
+// https://github.com/actix/examples/blob/master/websocket-chat/src/main.rs
+// https://github.com/actix/examples/blob/master/websocket-chat/src/server.rs
+async fn minx_ws (req: HttpRequest, stream: web::Payload, _srv: web::Data<Addr<server::ChatServer>>) -> Result<HttpResponse, Error> {
+    ws::start (ChatServer {}, &req, stream)
 }
+
+// #[derive(Message)]
+// #[rtype(result = "()")]
+// pub struct Message(pub String);
+
+
+
+// pub struct ChatServer {
+//     sessions: HashMap<i64, Recipient<Message>>,
+// }
+
+// impl ChatServer {
+//     pub fn new () -> ChatServer {
+//         ChatServer {
+//             sessions: HashMap::new (),
+//         }
+//     }
+// }
+
+// impl ChatServer {
+//     fn send_string(&self, _msg: String, dest_id: i64) -> bool {
+// 		match self.sessions.get (&dest_id) {
+// 		    Some(_addr) => match _addr.do_send (Message (_msg)) {
+// 			    Ok(_) => true,
+// 			    Err(_) => false
+// 			},
+// 		    None => false,
+// 		}
+//     }
+// }
+
+// impl Actor for ChatServer {
+//     type Context = Context<Self>;
+// }
+
+// #[derive(Message)]
+// #[rtype(i64)]
+// pub struct Connect {
+//     pub addr: Recipient<Message>,
+// }
+// impl Handler<Connect> for ChatServer {
+//     type Result = i64;
+
+//     fn handle(&mut self, msg: Connect, _: &mut Context<Self>) -> Self::Result {
+//         let id = self.rng.gen::<usize>();
+//         self.sessions.insert (id, msg.addr);
+//         id
+//     }
+// }
+
+// #[derive(Message)]
+// #[rtype(result = "()")]
+// pub struct ClientMessage {
+//     pub id: i64,
+//     pub msg: String,
+// }
+// impl Handler<ClientMessage> for ChatServer {
+//     type Result = ();
+
+//     fn handle(&mut self, msg: ClientMessage, _: &mut Context<Self>) {
+//         //self.send_message(&msg.room, msg.msg.as_str(), msg.id);
+//     }
+// }
