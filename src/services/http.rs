@@ -7,41 +7,41 @@ use std::{collections::HashMap, sync::atomic::AtomicI64, time::Duration, sync::a
 use crate::ServiceModule;
 
 pub struct Http {
-	m_port: i32,
-	m_server: WsChatServer,
+    m_port: i32,
+    m_server: WsChatServer,
 }
 
 #[async_trait]
 impl ServiceModule for Http {
-	fn get_name (&self) -> &'static str { "http" }
-	async fn async_entry (&self) {
+    fn get_name (&self) -> &'static str { "http" }
+    async fn async_entry (&self) {
         let _bind_str = format! ("0.0.0.0:{}", self.m_port);
-		match HttpServer::new (|| {
-			App::new ()
-				.service (minx_hello)
-				.service (web::resource ("/minx_ws/").to (minx_ws))
-				//.route ("/hey", web::get ().to (manual_hello))
-		}).bind (&_bind_str [..]) {
-		    Ok (mut _server) => { _server.run ().await; () },
-		    Err (_e) => println! ("http listen failed: {}", _e.to_string ()),
-		};
-	}
-	async fn async_send (&self, _msg: String) -> bool {
-		false
-	}
+        match HttpServer::new (|| {
+            App::new ()
+                .service (minx_hello)
+                .service (web::resource ("/minx_ws/").to (minx_ws))
+                //.route ("/hey", web::get ().to (manual_hello))
+        }).bind (&_bind_str [..]) {
+            Ok (mut _server) => { _server.run ().await; () },
+            Err (_e) => println! ("http listen failed: {}", _e.to_string ()),
+        };
+    }
+    async fn async_send (&self, _msg: String) -> bool {
+        false
+    }
 }
 
 impl Http {
-	pub fn new (_param: &HashMap<String, String>) -> Http {
-		let _port = match _param ["port"].to_string ().parse::<i32> () {
-		    Ok (_port) => _port,
-		    Err (_) => 80,
-		};
-		Http {
+    pub fn new (_param: &HashMap<String, String>) -> Http {
+        let _port = match _param ["port"].to_string ().parse::<i32> () {
+            Ok (_port) => _port,
+            Err (_) => 80,
+        };
+        Http {
             m_port: _port,
             m_server: WsChatServer::new (),
-		}
-	}
+        }
+    }
 }
 
 
@@ -63,16 +63,16 @@ pub enum WsPayloadData {
 pub struct WsMessage (pub WsPayloadData);
 
 struct WsChatServer {
-	m_inc: AtomicI64,
-	m_sessions: HashMap<i64, Recipient<WsMessage>>,
+    m_inc: AtomicI64,
+    m_sessions: HashMap<i64, Recipient<WsMessage>>,
 }
 impl WsChatServer {
-	pub fn new () -> WsChatServer {
-		WsChatServer {
-			m_inc: AtomicI64::new (0),
-			m_sessions: HashMap::new (),
-		}
-	}
+    pub fn new () -> WsChatServer {
+        WsChatServer {
+            m_inc: AtomicI64::new (0),
+            m_sessions: HashMap::new (),
+        }
+    }
     fn send_string (&self, _msg: String, dest_id: i64) -> bool {
         match self.m_sessions.get (&dest_id) {
             Some (_addr) => match _addr.do_send (WsMessage (WsPayloadData::Text (_msg))) {
@@ -87,8 +87,8 @@ impl Actor for WsChatServer {
    type Context = Context<Self>;
 }
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
-	//fn started (&mut self, _ctx: &mut Self::Context) {}
-	//fn finished (&mut self, _ctx: &mut Self::Context) { _ctx.stop () }
+    //fn started (&mut self, _ctx: &mut Self::Context) {}
+    //fn finished (&mut self, _ctx: &mut Self::Context) { _ctx.stop () }
     fn handle (&mut self, _msg: Result<ws::Message, ws::ProtocolError>, _ctx: &mut Self::Context) {
         let _msg = match _msg {
             Ok (_msg) => _msg,
@@ -107,15 +107,15 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
             ws::Message::Continuation (_) => _ctx.stop (),
             _ => (),
         };
-	}
+    }
 }
 
 async fn minx_ws (_req: HttpRequest, _stream: web::Payload, _srv: web::Data<Addr<WsChatServer>>) -> Result<HttpResponse, Error> {
     let mut _session = WsChatSession {
-		id: 0,
-		hb: Instant::now (),
-		addr: _srv.get_ref ().clone (),
-	};
+        id: 0,
+        hb: Instant::now (),
+        addr: _srv.get_ref ().clone (),
+    };
     ws::start (_session, &_req, _stream)
 }
 
@@ -125,7 +125,7 @@ struct WsChatSession {
     addr: Addr<WsChatServer>,
 }
 impl WsChatSession {
-	fn hb (&self, ctx: &mut ws::WebsocketContext<Self>) {
+    fn hb (&self, ctx: &mut ws::WebsocketContext<Self>) {
         ctx.run_interval (Duration::from_secs (5), |act, ctx| {
             if Instant::now ().duration_since (act.hb) > Duration::from_secs (10) {
                 act.addr.do_send (WsDisconnect { id: act.id });
