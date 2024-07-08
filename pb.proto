@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package minx.data.provider;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+
+
+
+message ArrayValue {
+    repeated Value items = 1;
+}
+
+message Int64MapValue {
+    map<int64, Value> items = 1;
+}
+
+message StringMapValue {
+    map<string, Value> items = 1;
+}
+
+message Value {
+    oneof ValueItem {
+        bool bool_value = 1;
+        int32 int8_value = 2;
+        uint32 uint8_value = 3;
+        int32 int16_value = 4;
+        uint32 uint16_value = 5;
+        int32 int32_value = 6;
+        uint32 uint32_value = 7;
+        int64 int64_value = 8;
+        uint64 uint64_value = 9;
+        string string_value = 10;
+        int64 timestamp_nanos = 11;
+        int64 duration_nanos = 12;
+        ArrayValue array_value = 13;
+        Int64MapValue int64_map_value = 14;
+        StringMapValue string_map_value = 15;
+    }
+}
+
+message KeyValuePair {
+    string key = 1;
+    Value value = 2;
+    optional int64 expired_nanos = 3;
+}
+
+service MinxDataProvider {
+    rpc SetValue(KeyValuePair) returns (google.protobuf.Empty) {}
+}

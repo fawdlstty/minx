@@ -1,41 +1,39 @@
-// cargo run -- -f minx.cfg
+pub mod value;
 
-mod config;
-//use async_std::task::{sleep, spawn};
+use std::error::Error;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpListener;
 
-use self::config::*;
-mod services;
-use self::services::*;
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    let addr = "0.0.0.0:8080";
+    let listener = TcpListener::bind(addr).await?;
+    println!("Listening on: {}", addr);
+    loop {
+        let (mut socket, _) = listener.accept().await?;
 
+        tokio::spawn(async move {
+            let mut buf = vec![0; 1024];
 
+            while let Ok(n) = socket.read(&mut buf).await {
+                if n == 0 {
+                    break;
+                }
 
-fn help () {
-    println!("Usage: minx [-f json_file]");
-    println!("Example:");
-    println!("    minx -f config.cfg          # load config.cfg and running");
-    println!("");
-}
+                // match buf[0] {
+                //     b'+' => {} // 单行字符串。"+OK\r\n"
+                //     b'-' => {} // 错误。"-err msg\r\n"
+                //     b':' => {} // 整型。":123\r\n"
+                //     b'$' => {} // 多行字符串。"$6\r\nfoobar\r\n"、"$-1\r\n"（不存在的值）
+                //     b'*' => {} // 数组。"*-1\r\n"（空对象的数组）
+                //     _ => {}
+                // }
 
-#[async_std::main]
-async fn main () {
-    match actix_web::HttpServer::new (|| {
-        actix_web::App::new ()
-            //.service (minx_hello)
-            //.service (minx_ws)
-            //.route ("/hey", web::get ().to (manual_hello))
-    }).bind ("127.0.0.1:8080") {
-        Ok (mut _server) => { _server.run ().await; () },
-        Err (_e) => println! ("http listen failed: {}", _e.to_string ()),
-    };
-    let _args: Vec<String> = std::env::args ().collect ();
-    //println!("{:?}", args);
-    let _cfg = get_config (&_args).await;
-    match _cfg {
-        Some (_cfg) => {
-            let mut _services = ServiceManager::new (_cfg.modules);
-            _services.async_entry ().await;
-            //_services.async_logger_critical ("main", "Program Start.").await;
-        },
-        None => help (),
+                // socket
+                //     .write_all(&buf[0..n])
+                //     .await
+                //     .expect("failed to write data to socket");
+            }
+        });
     }
 }

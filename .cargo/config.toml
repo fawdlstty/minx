@@ -1,0 +1,10 @@
+[target.armv7-unknown-linux-gnueabihf]
+linker = "arm-linux-gnueabihf-g++"
+
+[source.crates-io]
+registry = "https://github.com/rust-lang/crates.io-index"
+replace-with = 'rsproxy'
+[source.ustc]
+registry = "https://mirrors.ustc.edu.cn/crates.io-index"
+[source.rsproxy]
+registry = "https://rsproxy.cn/crates.io-index"
